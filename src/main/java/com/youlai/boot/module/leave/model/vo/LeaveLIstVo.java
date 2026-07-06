@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Schema(description = "个人请假列表对象")
-public class LeaveLIstVo {
+public class LeaveListVo {
 
     @Schema(description = "请假ID")
     private Long id;
