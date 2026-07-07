@@ -6,6 +6,7 @@ import com.youlai.boot.module.leave.model.form.LeaveApproveForm;
 import com.youlai.boot.module.leave.model.form.LeaveForm;
 import com.youlai.boot.module.leave.model.vo.LeaveListVo;
 import com.youlai.boot.module.leave.model.vo.LeavePendingVo;
+import com.youlai.boot.module.leave.model.vo.LeaveRecordVo;
 
 import java.util.List;
 
@@ -23,4 +24,7 @@ public interface LeaveService extends IService<LeaveRequest> {
     List<LeavePendingVo> listPendingLeaves();
 
     boolean approveLeave(Long id, LeaveApproveForm form);
+
+    List<LeaveRecordVo> getRecords();
+
 }

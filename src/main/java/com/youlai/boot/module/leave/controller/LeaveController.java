@@ -5,6 +5,7 @@ import com.youlai.boot.module.leave.model.form.LeaveApproveForm;
 import com.youlai.boot.module.leave.model.form.LeaveForm;
 import com.youlai.boot.module.leave.model.vo.LeaveListVo;
 import com.youlai.boot.module.leave.model.vo.LeavePendingVo;
+import com.youlai.boot.module.leave.model.vo.LeaveRecordVo;
 import com.youlai.boot.module.leave.service.LeaveService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,5 +49,11 @@ public class LeaveController {
     public Result<?> approveLeave(@PathVariable Long id,
                                   @RequestBody @Valid LeaveApproveForm form) {
         return Result.judge(leaveService.approveLeave(id, form));
+    }
+
+    @GetMapping("/records")
+    @PreAuthorize("@ss.hasPerm('module:leave:records')")
+    public  Result<List<LeaveRecordVo>> getRecords() {
+        return Result.success(leaveService.getRecords());
     }
 }

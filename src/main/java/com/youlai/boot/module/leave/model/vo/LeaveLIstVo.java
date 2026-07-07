@@ -29,6 +29,9 @@ public class LeaveListVo {
     @Schema(description = "审批状态")
     private int status;
 
+    @Schema(description = "当前审批阶段")//级别描述不太恰当，阶段含义更符合
+    private int currentStep;
+
     @Schema(description = "驳回原因")
     private String rejectReason;
 

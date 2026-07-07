@@ -9,7 +9,7 @@ import org.hibernate.validator.constraints.Range;
 
 @Getter
 @Setter
-@Schema(description = "请假审批对象")
+@Schema(description = "请假审批表单对象")
 public class LeaveApproveForm {
 
     @Schema(description = "请假审批结果")

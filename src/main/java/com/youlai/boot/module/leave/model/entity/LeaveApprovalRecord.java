@@ -8,32 +8,21 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("leave_request")
-public class LeaveRequest {
+@TableName("leave_approval_record")
+public class LeaveApprovalRecord {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long userId;
+    private Long leaveId;
 
-    private LocalDateTime startTime;
-
-    private LocalDateTime endTime;
-
-    private String reason;
-
-    private int status;
-
-    private int currentStep;
+    private  int step;
 
     private Long approverId;
 
-    private LocalDateTime approveTime;
+    private int action;
 
-    private String rejectReason;
+    private String comment;
 
     private LocalDateTime createTime;
-
-    private int isDeleted;
-
 }
