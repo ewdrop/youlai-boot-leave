@@ -24,10 +24,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +39,9 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
 
     @Override
     public boolean addLeave(LeaveForm formData) {
+        if (!formData.getEndTime().isAfter(formData.getStartTime())) {
+            throw new BusinessException("结束时间必须晚于开始时间");
+        }
         LeaveRequest entity = new LeaveRequest();
         entity.setStartTime(formData.getStartTime());
         entity.setEndTime(formData.getEndTime());
@@ -56,7 +57,7 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
         Long userId = SecurityUtils.getUserId();
         List<LeaveRequest> list =  this.list(new LambdaQueryWrapper<LeaveRequest>()
             .eq(LeaveRequest::getUserId, userId)
-            .orderByAsc(LeaveRequest::getCreateTime));
+            .orderByAsc(LeaveRequest::getApplicantTime));
 
         return leaveConverter.toMineList(list);
     }
@@ -66,8 +67,9 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
         Set<String> roles = SecurityUtils.getRoles();
         LambdaQueryWrapper<LeaveRequest> w = new LambdaQueryWrapper<LeaveRequest>()
             .eq(LeaveRequest::getStatus, LeaveStatusEnum.PENDING.getValue())
-            .orderByAsc(LeaveRequest::getCreateTime);
-        if (roles.contains("DEPT_MANAGER")) {
+            .ne(LeaveRequest::getUserId, SecurityUtils.getUserId())
+            .orderByAsc(LeaveRequest::getApplicantTime);
+        if (roles.contains("DEPT_MANAGER") || roles.contains("ADMIN")) {
             Long deptId = userService.getById(SecurityUtils.getUserId()).getDeptId();
             List<Long> userIds = userService.list(
                 new LambdaQueryWrapper<User>()
@@ -77,12 +79,28 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
                 return List.of();
             }
             w.eq(LeaveRequest::getCurrentStep, 1).in(LeaveRequest::getUserId, userIds);
-        } else if (roles.contains("ADMIN") || SecurityUtils.isRoot()) {
+        } else if ( SecurityUtils.isRoot()) {
             w.eq(LeaveRequest::getCurrentStep, 2);
         }else {
             return List.of();
         }
-        return leaveConverter.toPendingList(this.list(w));
+        //修复审批列表信息不清晰，修改申请人id->nickname
+        List<LeaveRequest> leaves = this.list(w);
+        if (leaves.isEmpty()) return List.of();
+        List<Long> userIds = leaves.stream()
+            .map(LeaveRequest::getUserId)
+            .distinct()
+            .toList();
+        Map<Long,User>  userMap = userService.listByIds(userIds)
+            .stream().collect(Collectors.toMap(User::getId, u -> u));
+        List<LeavePendingVo> result = leaveConverter.toPendingList(leaves);
+        for (LeavePendingVo leavePendingVo : result) {
+            User user = userMap.get(leavePendingVo.getUserId());
+            if (user != null) {
+                leavePendingVo.setNickname(user.getNickname());
+            }
+        }
+        return result;
     }
 
     @Override
@@ -104,7 +122,10 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
         if (applicant == null || approver == null) {
             throw new BusinessException("用户不存在");
         }
-        //修正，只有审批流程为部门主管才验证部门权限
+        if (approver.getId().equals(applicant.getId())) {
+            throw new BusinessException("无权审批自己，请找同事代批");
+        }
+        //修正，只有审批流程为部门才验证部门权限
         if (entity.getCurrentStep() == LeaveStepEnum.STEP1.getValue()) {
             if (!Objects.equals(applicant.getDeptId(), approver.getDeptId())) {
                 throw new BusinessException("无权审批其他部门的请假");
@@ -117,11 +138,13 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
         if ( action == 2 && StrUtil.isBlank(form.getRejectReason())) {
             throw new BusinessException("驳回原因不能为空");
         }
+        LocalDateTime now = LocalDateTime.now();
         //7.改从表记录
         LeaveApprovalRecord record = new LeaveApprovalRecord();
         record.setLeaveId(entity.getId());
         record.setStep(entity.getCurrentStep());
         record.setApproverId(approver.getId());
+        record.setCreateTime(now);
         record.setAction(form.getAction());
         //8.改主表
         if (action == 2) {
@@ -136,7 +159,7 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
         } else if (step == 2) {
             entity.setStatus(LeaveStatusEnum.APPROVE.getValue());
             entity.setCurrentStep(LeaveStepEnum.STEP3.getValue());
-            entity.setApproveTime(LocalDateTime.now());
+            entity.setApproveTime(now);
             entity.setRejectReason(null);
         }
         leaveApprovalRecordMapper.insert(record);
@@ -146,34 +169,55 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
 
     @Override
     public List<LeaveRecordVo> getRecords() {
-        List<Long> ids = new ArrayList<>();
-            this.list(new LambdaQueryWrapper<LeaveRequest>()
-            .eq(LeaveRequest::getUserId, SecurityUtils.getUserId()))
-            .forEach(item -> ids.add(item.getId()));
-
-            if (ids.isEmpty()) {
-                return List.of();
-            }
-            List<LeaveApprovalRecord> records = leaveApprovalRecordMapper.selectList(
+        List<LeaveApprovalRecord> records = leaveApprovalRecordMapper.selectList(
                 new LambdaQueryWrapper<LeaveApprovalRecord>()
-                    .in(LeaveApprovalRecord::getLeaveId, ids)
+                    .eq(LeaveApprovalRecord::getApproverId, SecurityUtils.getUserId())
                     .orderByAsc(LeaveApprovalRecord::getCreateTime)
-            );
-         return leaveConverter.toRecordList(records);
+        );
+        List<LeaveRecordVo> result = leaveConverter.toRecordList(records);
+        if (records.isEmpty()) return List.of();
+        List<Long> leaveIds = records.stream()
+            .map(LeaveApprovalRecord::getLeaveId)
+            .distinct()
+            .toList();
+        Map<Long,LeaveRequest> leaveMap = this.listByIds(leaveIds)
+            .stream().collect(Collectors.toMap(LeaveRequest::getId, r->r));
+        List<Long> userIds = leaveMap.values().stream()
+            .map(LeaveRequest::getUserId)
+            .distinct()
+            .toList();
+        Map<Long, User>  userMap = userService.listByIds(userIds)
+            .stream().collect(Collectors.toMap(User::getId, u -> u));
+        for (LeaveRecordVo leaveRecordVo : result) {
+            LeaveRequest leave = leaveMap.get(leaveRecordVo.getLeaveId());
+            if (leave != null) {
+                leaveRecordVo.setApplicantTime(leave.getApplicantTime());
+                User u = userMap.get(leave.getUserId());
+                if (u != null) leaveRecordVo.setNickname(u.getNickname());
+            }
+        }
+         return result;
     }
 
+    /**
+     *
+     * @param entity
+     * 请假审批逻辑
+     * dept_member------>dept_manager/admin------>root
+     * 提交               审批（经理、管理员互批）    终审
+     * @return
+     */
     private static int getStep(LeaveRequest entity) {
         int step = entity.getCurrentStep();
         Set<String> roles = SecurityUtils.getRoles();
         if (step == 1) {
-            boolean canApprove = roles.contains("DEPT_MANAGER") || SecurityUtils.isRoot();
+            boolean canApprove = roles.contains("DEPT_MANAGER") || roles.contains("ADMIN");
             if (!canApprove) {
-                throw new BusinessException("当前轮到主管审批");
+                throw new BusinessException("当前轮到部门审批");
             }
         }else if (step == 2) {
-            boolean canApprove = roles.contains("ADMIN") || SecurityUtils.isRoot();
-            if (!canApprove) {
-                throw new BusinessException("当前轮到经理审批");
+            if (!SecurityUtils.isRoot()) {
+                throw new BusinessException("当前轮到超管终审");
             }
         }
         return step;

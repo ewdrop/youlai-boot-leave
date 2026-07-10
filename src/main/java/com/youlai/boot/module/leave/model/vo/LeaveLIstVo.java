@@ -15,6 +15,10 @@ public class LeaveListVo {
     @Schema(description = "请假ID")
     private Long id;
 
+    @Schema(description = "申请请假时间")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime applicantTime;
+
     @Schema(description = "请假开始时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime startTime;
@@ -37,6 +41,7 @@ public class LeaveListVo {
 
     @Schema(description = "审批时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    //动态的->当前审批结果的时间，随审批结果更新而更新
     private LocalDateTime approveTime;
 
 }

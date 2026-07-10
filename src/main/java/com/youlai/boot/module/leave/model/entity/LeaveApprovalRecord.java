@@ -24,5 +24,6 @@ public class LeaveApprovalRecord {
 
     private String comment;
 
+    //该条审批记录创建的时间
     private LocalDateTime createTime;
 }

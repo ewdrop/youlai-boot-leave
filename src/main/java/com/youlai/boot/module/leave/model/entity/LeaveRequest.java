@@ -28,11 +28,12 @@ public class LeaveRequest {
 
     private Long approverId;
 
+    //最近审批结果的时间
     private LocalDateTime approveTime;
 
     private String rejectReason;
 
-    private LocalDateTime createTime;
+    private LocalDateTime applicantTime;
 
     private int isDeleted;
 

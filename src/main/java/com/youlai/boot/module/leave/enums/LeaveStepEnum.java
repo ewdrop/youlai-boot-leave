@@ -7,8 +7,8 @@ import lombok.Getter;
 @Getter
 @Schema(enumAsRef = true)
 public enum LeaveStepEnum implements IBaseEnum<Integer> {
-    STEP1(1, "主管"),
-    STEP2(2, "经理"),
+    STEP1(1, "部门审批"),
+    STEP2(2, "终审"),
     STEP3(3, "结束");
 
     private final Integer value;

@@ -15,8 +15,11 @@ public class LeavePendingVo {
     @Schema(description = "请假ID")
     private Long id;
 
-    @Schema(description = "申请人ID")
+    @Schema(description = "申请人Id")
     private Long userId;
+
+    @Schema(description = "申请人昵称")
+    private String nickname;
 
     @Schema(description = "请假开始时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -31,6 +34,6 @@ public class LeavePendingVo {
 
     @Schema(description = "申请时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime createTime;
+    private LocalDateTime applicantTime;
 
 }

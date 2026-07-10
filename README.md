@@ -73,6 +73,8 @@ git clone https://gitee.com/youlaiorg/youlai-boot.git
 
 执行 [youlai_admin.sql](sql/mysql/youlai_admin.sql) 创建数据库和基础数据。
 
+再执行[leave-v0-v1.sql](sql/mysql/leave/)
+
 **3. 修改配置**
 
 编辑 [application-dev.yml](src/main/resources/application-dev.yml)，配置 MySQL 和 Redis：
