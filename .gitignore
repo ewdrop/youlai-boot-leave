@@ -11,7 +11,7 @@ target
 *.log
 logs
 .history
-
+application-dev.yml
 
 docker/*/data/
 docker/minio/config

@@ -10,6 +10,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -51,5 +55,17 @@ public class FileController {
     ) {
         boolean result = fileService.deleteFile(filePath);
         return Result.judge(result);
+    }
+    @GetMapping("/download")
+    @Operation(summary = "文件浏览")
+    @SneakyThrows
+    public ResponseEntity<Resource> download(
+            @Parameter(description = "文件路径") @RequestParam String filePath
+    ) {
+        Resource resource = fileService.readFile(filePath);
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_OCTET_STREAM)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+            .body(resource);
     }
 }

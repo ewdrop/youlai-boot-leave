@@ -18,10 +18,16 @@ import com.youlai.boot.module.leave.model.vo.LeavePendingVo;
 import com.youlai.boot.module.leave.model.vo.LeaveRecordVo;
 import com.youlai.boot.module.leave.service.LeaveService;
 import com.youlai.boot.security.util.SecurityUtils;
+import com.youlai.boot.system.model.entity.Notice;
+import com.youlai.boot.system.model.entity.Role;
 import com.youlai.boot.system.model.entity.User;
+import com.youlai.boot.system.service.NoticeService;
+import com.youlai.boot.system.service.RoleService;
+import com.youlai.boot.system.service.UserRoleService;
 import com.youlai.boot.system.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -37,6 +43,13 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
 
     private final UserService userService;
 
+    private final RoleService roleService;
+
+    private final UserRoleService userRoleService;
+
+    private final NoticeService noticeService;
+
+    @Transactional
     @Override
     public boolean addLeave(LeaveForm formData) {
         if (!formData.getEndTime().isAfter(formData.getStartTime())) {
@@ -48,7 +61,35 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
         entity.setStatus(LeaveStatusEnum.PENDING.getValue());
         entity.setCurrentStep(LeaveStepEnum.STEP1.getValue());
         entity.setReason(formData.getReason());
+        entity.setAttachment(formData.getAttachment());
         entity.setUserId(SecurityUtils.getUserId());
+        Notice notice = getNotice();
+        notice.setContent("您有一条请假单待审批.");
+        List<Long> roleIds = roleService.list(new LambdaQueryWrapper<Role>()
+            .in(Role::getCode,List.of("DEPT_MANAGER", "ADMIN"))
+                .select(Role::getId)
+        ).stream()
+            .map(Role::getId)
+            .toList();
+        Set<Long> approveIds = new HashSet<>();
+        for (Long roleId : roleIds) {
+            approveIds.addAll(userRoleService.listUserIdsByRoleId(roleId));
+        }
+        Long deptId = SecurityUtils.getDeptId();
+        Long selfId = SecurityUtils.getUserId();
+        if (!approveIds.isEmpty()) {
+            List<User> users = userService.listByIds(approveIds)
+                .stream()
+                .filter(u->Objects.equals(u.getDeptId(), deptId))
+                .filter(u->!Objects.equals(u.getId(), selfId))
+                .toList();
+            String targetUserIds = users.stream()
+                .map(u->String.valueOf(u.getId()))
+                .collect(Collectors.joining(","));
+            notice.setTargetUserIds(targetUserIds);
+            boolean saved = noticeService.save(notice);
+            if (saved) noticeService.publishNotice(notice.getId());
+        }
         return this.save(entity);
     }
 
@@ -103,6 +144,7 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
         return result;
     }
 
+    @Transactional
     @Override
     public boolean approveLeave(Long id, LeaveApproveForm form) {
 
@@ -164,7 +206,48 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
         }
         leaveApprovalRecordMapper.insert(record);
         entity.setApproverId(approver.getId());
-        return this.updateById(entity);
+        boolean updated = this.updateById(entity);
+        if (!updated) {
+            return false;
+        }
+        if (action == 2) {
+            Notice notice = getNotice();
+            notice.setContent("您的请假单被驳回");
+            notice.setTargetUserIds(String.valueOf(entity.getUserId()));
+            boolean saved = noticeService.save(notice);
+            if (saved) noticeService.publishNotice(notice.getId());
+        } else if (step == 1) {
+            Notice notice = getNotice();
+            notice.setContent("您有一条请假单待审批.");
+            List<Long> roleIds = roleService.list(new LambdaQueryWrapper<Role>()
+                    .in(Role::getCode,List.of("ROOT"))
+                    .select(Role::getId)
+                ).stream()
+                .map(Role::getId)
+                .toList();
+            Set<Long> approveIds = new HashSet<>();
+            for (Long roleId : roleIds) {
+                approveIds.addAll(userRoleService.listUserIdsByRoleId(roleId));
+            }
+            if (!approveIds.isEmpty()) {
+                String targetUserIds = approveIds
+                    .stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
+                notice.setTargetUserIds(targetUserIds);
+                if (noticeService.save(notice)) {
+                    noticeService.publishNotice(notice.getId());
+                }
+            }
+        } else if (step == 2) {
+            Notice notice = getNotice();
+            notice.setContent("您的请假单已批准");
+            notice.setTargetUserIds(String.valueOf(entity.getUserId()));
+            if (noticeService.save(notice)) {
+                noticeService.publishNotice(notice.getId());
+            }
+        }
+        return true;
     }
 
     @Override
@@ -221,6 +304,18 @@ public class LeaveServiceImpl extends ServiceImpl<LeaveMapper, LeaveRequest> imp
             }
         }
         return step;
+    }
+
+    private static Notice getNotice() {
+        Notice notice = new Notice();
+        notice.setTitle("审批提醒");
+        notice.setType(99);
+        notice.setPublisherId(0L);
+        notice.setLevel("M");
+        notice.setCreateBy(SecurityUtils.getUserId());
+        notice.setTargetType(2);
+        notice.setPublishStatus(0);
+        return notice;
     }
 
 }

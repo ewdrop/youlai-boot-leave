@@ -4,6 +4,7 @@ import cn.hutool.core.date.DatePattern;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
+import com.youlai.boot.core.exception.BusinessException;
 import com.youlai.boot.module.file.model.FileInfo;
 import com.youlai.boot.module.file.service.FileService;
 import lombok.Data;
@@ -12,11 +13,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 
 /**
@@ -35,6 +41,8 @@ public class LocalFileService implements FileService {
 
     @Value("${oss.local.storage-path}")
     private String storagePath;
+
+    private final ResourceLoader resourceLoader;
 
     /**
      * 上传文件方法
@@ -88,5 +96,30 @@ public class LocalFileService implements FileService {
         }
         // 删除文件
         return FileUtil.del(storagePath + filePath);
+    }
+
+    @Override
+    public Resource readFile(String relativePath) {
+        Path path = resolveSafePath(relativePath);
+        if (!Files.exists(path) || !Files.isRegularFile(path)) {
+            throw new BusinessException("文件不存在");
+        }
+        return resourceLoader.getResource(path.toUri().toString());
+    }
+
+    private Path resolveSafePath(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            throw new BusinessException("路径为空");
+        }
+        Path base = Paths.get(storagePath).toAbsolutePath().normalize();
+        String cleaned = relativePath.replace("\\", "/");
+        while (cleaned.startsWith("/")) {
+            cleaned = cleaned.substring(1);
+        }
+        Path target = base.resolve(cleaned).normalize();
+        if (!target.startsWith(base)) {
+            throw new BusinessException("非法路径");
+        }
+        return target;
     }
 }

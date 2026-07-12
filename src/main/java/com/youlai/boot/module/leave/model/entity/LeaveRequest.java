@@ -1,14 +1,18 @@
 package com.youlai.boot.module.leave.model.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import com.youlai.boot.module.file.model.FileInfo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
-@TableName("leave_request")
+@TableName(value = "leave_request", autoResultMap = true)
 public class LeaveRequest {
 
     @TableId(type = IdType.AUTO)
@@ -21,6 +25,9 @@ public class LeaveRequest {
     private LocalDateTime endTime;
 
     private String reason;
+
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private List<FileInfo> attachment;
 
     private int status;
 

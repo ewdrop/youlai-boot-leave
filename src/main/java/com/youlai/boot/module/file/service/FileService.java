@@ -1,6 +1,7 @@
 package com.youlai.boot.module.file.service;
 
 import com.youlai.boot.module.file.model.FileInfo;
+import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -26,5 +27,8 @@ public interface FileService {
      */
     boolean deleteFile(String filePath);
 
+    default Resource readFile(String relativePath) {
+        throw new UnsupportedOperationException("暂不支持");
+    }
 
 }

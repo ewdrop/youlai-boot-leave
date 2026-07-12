@@ -1,6 +1,7 @@
 package com.youlai.boot.module.leave.model.form;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.youlai.boot.module.file.model.FileInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -10,6 +11,7 @@ import lombok.Setter;
 import org.hibernate.validator.constraints.Range;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -30,5 +32,8 @@ public class LeaveForm {
     @Schema(description = "申请原因")
     @NotBlank(message = "申请原因不能为空")
     private String reason;
+
+    @Schema(description = "附件")
+    private List<FileInfo> attachment;
 
 }
